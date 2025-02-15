@@ -1,0 +1,54 @@
+FROM ubuntu:22.04 AS build
+COPY uml.config /uml.config
+# Use Linux 6.3 kernel and adjust download URL accordingly.
+ENV LINUX_VERSION=linux-6.3
+ENV LINUX_DOWNLOAD_URL=https://cdn.kernel.org/pub/linux/kernel/v6.x/${LINUX_VERSION}.tar.xz
+RUN apt-get update \
+ && apt-get -y install build-essential flex bison xz-utils wget ca-certificates bc \
+ && wget ${LINUX_DOWNLOAD_URL} \
+ && tar xJf ${LINUX_VERSION}.tar.xz \
+ && rm ${LINUX_VERSION}.tar.xz \
+ && cd ${LINUX_VERSION} \
+ && cp /uml.config .config \
+ && make ARCH=um -j10 \
+ && mv ./linux / \
+ && cd .. \
+ && rm -rf ${LINUX_VERSION}
+
+FROM alpine:latest
+
+# Install glibc and glibc-bin with force-overwrite to resolve conflicts with gcompat.
+RUN apk --no-cache add ca-certificates wget && \
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-2.35-r1.apk && \
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-bin-2.35-r1.apk && \
+    apk add --force-overwrite glibc-2.35-r1.apk glibc-bin-2.35-r1.apk && \
+    rm glibc-2.35-r1.apk glibc-bin-2.35-r1.apk && \
+    /usr/glibc-compat/sbin/ldconfig /lib && \
+    ln -sf /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
+
+RUN apk add iptables
+
+# Ensure that glibc libraries are used instead of musl.
+ENV LD_LIBRARY_PATH=/usr/glibc-compat/lib
+
+COPY --from=build /linux /linux
+ADD https://xena.greedo.xeserv.us/files/slirp /slirp
+
+# Add Tini
+ENV TINI_VERSION=v0.18.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static /chroot/tini
+RUN chmod +x /chroot/tini
+
+# Set up chroot with Alpine 3.18 minirootfs
+RUN mkdir -p /chroot /chroot/etc && \
+    cd /chroot && \
+    wget -O - http://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64/alpine-minirootfs-3.21.0-x86_64.tar.gz | tar xz && \
+    chmod +x /linux && \
+    chmod +x /slirp
+
+COPY init.sh /chroot/init.sh
+COPY resolv.conf /chroot/etc/resolv.conf
+
+COPY runlinux.sh /runlinux.sh
+CMD ["/runlinux.sh"]

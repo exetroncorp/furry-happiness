@@ -26,7 +26,7 @@ RUN chmod +x /chroot/tini
 
 # Set up chroot
 RUN cd /chroot \
- && wget -O - http://dl-cdn.alpinelinux.org/alpine/v3.10/releases/x86_64/alpine-minirootfs-3.10.0-x86_64.tar.gz | tar xz \
+ && wget -O - http://dl-cdn.alpinelinux.org/alpine/v3.18/releases/x86_64/alpine-minirootfs-3.18.0-x86_64.tar.gz | tar xz \
  && chmod +x /linux \
  && chmod +x /slirp
 COPY init.sh /chroot/init.sh

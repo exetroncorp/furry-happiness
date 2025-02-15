@@ -20,3 +20,22 @@ To run:
 ```
 docker run --rm -it xena/docker-uml
 ```
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+apk update
+apk add podman fuse-overlayfs iptables-legacy
+apk add nftables aardvark-dns
+ln -sf /usr/sbin/iptables-legacy /usr/sbin/iptables
+ln -sf /usr/sbin/ip6tables-legacy /usr/sbin/ip6tables
+mkdir -p /dev/shm   
+mount -t tmpfs tmpfs /dev/shm
+sed -i '/^#mount_program/s/^#//'  /etc/containers/storage.conf 
+sed -i 's|^graphroot = .*$|graphroot = "/tmp/var/lib/containers/storage"|' /etc/containers/storage.conf 
+sed -i 's|^runroot = .*$|runroot = "/tmp/run/containers/storage"|' /etc/containers/storage.conf 
+podman run hello-world
+
+# In the Alpine stage, add these packages:
+apk --no-cache add     iptables     ip6tables     iproute2     bridge-utils     iputils     net-tools
+ 
+
+
+
